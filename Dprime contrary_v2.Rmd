@@ -1,0 +1,101 @@
+---
+title: "D' on decision biased by contrarian and agree traits"
+author: "Jesper Alvarsson-Hjort"
+date: "4/4/2022"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+cat("\014")
+
+# import libraries
+library(haven) # to read data from SPSS .sav files
+library(psycho) # library used to compute dprime
+
+dat_original <- read_sav("SocialRationalityVariables.sav")
+dat=dat_original
+dat$pin = 1:nrow(dat)
+# First four variables should be contrarian and last three should be agree situations
+dat = dat[,c("pin","Q100","Q101_1_1","Q101_1_2","Q106_1_1","Q97","Q105","Q98")]
+
+Type = c("Contrarian [1=Hit / 0=Miss]","Agree [1=Hit / 0=Miss]"," Proportion alternatives")
+Task = c("1 = HIT","1 = HIT","0/.14/.29/.43/.57/.71/.86/1")
+ContrarianFA = c("0 = Miss","0 = False alarm","0/.25/.50/.75/1")
+AgreeFA= c("0 = False alarm","0 = Miss","0/.33/.66/1")
+theory_df = data.frame(Type,Task,ContrarianFA,AgreeFA)
+colnames(theory_df) = c("Type","Task","Contrarian FA","Agree FA")
+
+```
+
+## Theoretical assumptions
+
+This script computes d' for data from the course Strategic thinking. In the data there are four items measuring contrarian situations and three items that measure agreeable situations.
+
+The analysis is conducted separately for contrarian and agree traits, where the opposite situation in relation to the trait analysed can result in false alarms. The falsa alarms are interpreted as the trait influencing the participant som that they answer incorreclty. This cannot be done in the situation corresponding to the trait because in this situation the correct answer and trait pulls in the same direction. Thus in these situation the wrong answer is seen as a miss. This means that each person has two d' one influenced by the contrarian trait and one influenced by the agree trait. Table 1 shows the relation between traits and answers.
+
+
+```{r Data table, echo=TRUE,fig.cap="left-aligned"}
+knitr::kable(theory_df, caption="Table 1. Theoretical model and assuption",)
+
+
+
+```
+
+
+## Adjusting hits
+
+The analysis is conducted in two steps. First the hits and false alarms are defined for each trait. Than d' is calculated based on the new data.Tables 2 and 3 show the adjustment done to the variables.The first step was to adjust the data so that all answers "1" are hits regardless of situation 
+
+```{r Data configuration, echo=TRUE}
+# First four are contrarian situation, last three are agree situations, the very first column is the pin, or id number.
+# For those columns that have a value of 1 in the variable "vector_of_change_hit_value" will invert all answers
+vector_of_change_hit_values = c(F,F,F,F,F,T,T,T)
+dat_correct = dat
+dat_correct[,vector_of_change_hit_values]=1-dat_correct[,vector_of_change_hit_values]
+
+knitr::kable(head(dat),caption="Table 2. Original data")
+
+knitr::kable(head(dat_correct),caption="Table 3. Hit adjusted data")
+
+```
+
+
+## Calculating hits and false alarms
+
+In the next step the "hits" and "false alarms" are computed for contrarian and agree variables according to the theoretical assumption. That is contrarian false alarms only occured in agree situations and agree false alarms only occured in contrarian situations.
+
+
+```{r Hit and False alarms computing, echo=TRUE}
+contrarian_H_FA=data.frame(dat_correct$pin,rowMeans(dat_correct[,2:8],na.rm=TRUE),rowMeans((1-dat_correct[,6:8]),na.rm=TRUE))
+colnames(contrarian_H_FA) = c("PIN", "Hits", "False alarms")
+agree_H_FA=data.frame(dat_correct$pin,rowMeans(dat_correct[,2:8],na.rm=TRUE),rowMeans((1-dat_correct[,2:5]),na.rm=TRUE))
+colnames(agree_H_FA) = c("PIN", "Hits", "False_alarms")
+
+knitr::kable(head(contrarian_H_FA),caption="Table 4. Contrarian trait",digits=3)
+knitr::kable(head(agree_H_FA),caption="Table 5. Agree trait",digits=3)
+
+```
+
+
+## Calculating d'
+
+Lastly the d' was computed for the two traits based on d'=z(hits)-z(false alarms). Because the just computed variables were in proportions, the inverse of the cumulative normal distribution function was used, called [qnorm](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/Normal) in R. All subjects that miss data are removed before the analysis.
+
+
+```{r dprime calculation, echo=TRUE}
+contrarian_H_FA_final=contrarian_H_FA[complete.cases(contrarian_H_FA[ , 2:3]),]
+results_contrarian=data.frame(contrarian_H_FA_final$PIN,qnorm(contrarian_H_FA_final[,2])-qnorm(contrarian_H_FA_final[,3]))
+colnames(results_contrarian) = c("PIN", "d'")
+
+agree_H_FA_final=agree_H_FA[complete.cases(agree_H_FA[ , 2:3]),]
+results_agree=data.frame(agree_H_FA_final$PIN,qnorm(agree_H_FA_final[,2])-qnorm(agree_H_FA_final[,3]))
+colnames(results_agree) = c("PIN", "d'")
+
+knitr::kable(results_contrarian,caption="Table 6. Contrarian trait",digits=3)
+knitr::kable(results_contrarian,caption="Table 7. Agree trait",digits=3)
+
+```
+
