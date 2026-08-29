@@ -3,7 +3,7 @@
    online) with an offline cache fallback, and caches other assets — fonts
    and the OCR engine (Tesseract core + language data) — on first use so
    scanning keeps working without a connection afterwards. */
-const CACHE = 'receipt-split-v5';
+const CACHE = 'receipt-split-v6';
 const SHELL = [
   './',
   './index.html',
