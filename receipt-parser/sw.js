@@ -1,8 +1,9 @@
-/* Split the Bill — service worker.
-   Caches the app shell so it opens offline, and runtime-caches the fonts
-   and OCR engine (Tesseract core + language data) on first use so scanning
-   keeps working without a connection afterwards. */
-const CACHE = 'split-bill-v2';
+/* Receipt Split — service worker.
+   Serves the app HTML network-first (so updates land as soon as you're
+   online) with an offline cache fallback, and caches other assets — fonts
+   and the OCR engine (Tesseract core + language data) — on first use so
+   scanning keeps working without a connection afterwards. */
+const CACHE = 'receipt-split-v3';
 const SHELL = [
   './',
   './index.html',
@@ -31,12 +32,27 @@ self.addEventListener('activate', function(e){
 self.addEventListener('fetch', function(e){
   var req = e.request;
   if (req.method !== 'GET') return;
+
+  // App HTML: network-first so a new deploy shows up promptly, cache fallback offline.
+  var isDoc = req.mode === 'navigate' || req.destination === 'document';
+  if (isDoc){
+    e.respondWith(
+      fetch(req).then(function(res){
+        var copy = res.clone();
+        caches.open(CACHE).then(function(c){ c.put(req, copy); }).catch(function(){});
+        return res;
+      }).catch(function(){
+        return caches.match(req).then(function(hit){ return hit || caches.match('./index.html'); });
+      })
+    );
+    return;
+  }
+
+  // Everything else: cache-first, then network (and cache it for next time).
   e.respondWith(
     caches.match(req).then(function(hit){
       if (hit) return hit;
       return fetch(req).then(function(res){
-        // Cache successful same-origin responses and opaque cross-origin ones
-        // (fonts, cdnjs, tessdata) so the app works offline after first use.
         if (res && (res.status === 200 || res.type === 'opaque')){
           var copy = res.clone();
           caches.open(CACHE).then(function(c){ c.put(req, copy); }).catch(function(){});

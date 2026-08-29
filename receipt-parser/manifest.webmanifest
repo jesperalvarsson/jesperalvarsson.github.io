@@ -1,7 +1,7 @@
 {
-  "name": "Split the Bill",
-  "short_name": "Split",
-  "description": "Scan a restaurant receipt, split it per item, and settle up.",
+  "name": "Receipt Split",
+  "short_name": "Receipt Split",
+  "description": "Scan a receipt, split it per item, and settle up.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

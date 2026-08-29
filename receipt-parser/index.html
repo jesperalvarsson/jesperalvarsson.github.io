@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Split the Bill</title>
-<meta name="description" content="Scan a restaurant receipt, split every line onto its own card, select who's paying, and settle up.">
+<title>Receipt Split</title>
+<meta name="description" content="Scan a receipt, split every line onto its own card, choose who's paying, and settle up.">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#b23a48">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Split">
+<meta name="apple-mobile-web-app-title" content="Receipt Split">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -168,9 +168,23 @@ button{font-family:inherit}
 }
 
 .empty{
-  text-align:center; color:var(--ink-3); padding:48px 20px;
-  font-size:14px; line-height:1.6;
+  text-align:center; color:var(--ink-2); padding:44px 22px;
+  font-size:14.5px; line-height:1.6;
+  display:flex; flex-direction:column; align-items:center; gap:14px;
 }
+.empty .eicon{
+  width:58px;height:58px;border-radius:16px;background:var(--surface);
+  border:1.5px dashed var(--line-2); display:grid;place-items:center;
+}
+.empty .eicon svg{width:27px;height:27px;stroke:var(--ink-3);stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.empty p{margin:0}
+.empty strong{color:var(--ink); font-weight:600}
+.linkbtn{
+  background:none;border:none;color:var(--accent);font:inherit;font-weight:600;
+  font-size:13.5px;cursor:pointer;padding:6px 4px;border-radius:8px;
+}
+.linkbtn:hover{text-decoration:underline}
+.linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ---------- add bar ---------- */
 .addbar{display:flex; gap:8px; padding:6px 14px 12px}
@@ -267,9 +281,9 @@ button{font-family:inherit}
 <body>
 <div class="app">
   <header class="masthead">
-    <div class="brand">Split&nbsp;·&nbsp;the&nbsp;bill</div>
-    <h1 class="place" id="place">Restoranas “St. Valentino”</h1>
-    <div class="meta" id="meta">Table 4 · 6 guests · 2026-08-29</div>
+    <div class="brand">Receipt&nbsp;·&nbsp;Split</div>
+    <h1 class="place" id="place">New bill</h1>
+    <div class="meta" id="meta">Scan a receipt to get started</div>
   </header>
 
   <main class="list" id="list"></main>
@@ -280,7 +294,7 @@ button{font-family:inherit}
       <span id="addlabel">Scan a receipt photo</span>
       <input type="file" accept="image/*" capture="environment" hidden id="photo">
     </label>
-    <button class="ghost" id="reset" title="Reload the sample receipt">Sample</button>
+    <button class="ghost" id="clear" title="Start a new empty bill">Clear</button>
   </div>
 
   <footer class="settle">
@@ -318,33 +332,25 @@ button{font-family:inherit}
     CHF:{rate:0.95, locale:"de-CH"}
   };
 
-  /* ---------- the example receipt (prices in EUR) ---------- */
-  var SAMPLE = {
-    place:"Restoranas “St. Valentino”",
-    meta:"Table 4 · 6 guests · 2026-08-29",
+  /* ---------- optional demo (generic sample data, no real place) ---------- */
+  var DEMO = {
+    place:"Demo receipt",
+    meta:"Sample data · tap items, then Payed",
     rows:[
-      {name:"Stalo vanduo su priedais 1 l",            price:4.50, cls:"A", qty:1},
-      {name:"ACALA 330 ml",                            price:6.80, cls:"A", qty:1},
-      {name:"Užstatas už pakuotę",                     price:0.10, cls:"E", qty:1},
-      {name:"San Pellegrino 750 ml",                   price:5.80, cls:"A", qty:1},
-      {name:"Žalieji kokteiliai",                      price:7.00, cls:"A", qty:2},
-      {name:"Burokėlių sr. su jautiena",               price:6.00, cls:"A", qty:1},
-      {name:"Traškios daržovės keptos ant grotelių",   price:16.00,cls:"A", qty:3},
-      {name:"Grill lašišos filė (priedas)",            price:7.00, cls:"A", qty:3},
-      {name:"Kold. su jautiena, barav. padaže",        price:16.00,cls:"A", qty:1},
-      {name:"Burok. krosn. su ožkos sū.",              price:15.00,cls:"A", qty:1},
-      {name:"Salotos su antiena lėtai troškinta",      price:17.00,cls:"A", qty:1},
-      {name:"Galvanina vanduo 355 ml",                 price:3.80, cls:"A", qty:1},
-      {name:"Užstatas už pakuotę",                     price:0.10, cls:"E", qty:1}
+      {name:"Flat white",           price:3.80, cls:"A", qty:2},
+      {name:"Avocado toast",        price:9.50, cls:"A", qty:1},
+      {name:"Buttermilk pancakes",  price:8.00, cls:"A", qty:1},
+      {name:"Fresh orange juice",   price:4.50, cls:"A", qty:2},
+      {name:"Side salad",           price:5.00, cls:"A", qty:1}
     ]
   };
 
   /* ---------- state ---------- */
   var state = { place:"", meta:"", currency:"EUR", items:[], payCounter:0, wasAllPaid:false };
   var uid = 0;
-  var STORE = "receipt-splitter-v1";
+  var STORE = "receipt-split-v1";
 
-  /* expand receipt rows into one card per unit (multi-item rows split) */
+  /* expand rows into one card per unit (multi-item rows split) */
   function rowsToItems(rows){
     var out = [];
     rows.forEach(function(r){
@@ -360,11 +366,16 @@ button{font-family:inherit}
     return out;
   }
 
-  function loadSample(){
-    state.place = SAMPLE.place;
-    state.meta  = SAMPLE.meta;
-    state.items = rowsToItems(SAMPLE.rows);
+  function loadDemo(){
+    state.place = DEMO.place;
+    state.meta  = DEMO.meta;
+    state.items = rowsToItems(DEMO.rows);
     state.payCounter = 0; state.wasAllPaid = false;
+  }
+
+  function clearAll(){
+    state.place=""; state.meta=""; state.items=[];
+    state.payCounter=0; state.wasAllPaid=false;
   }
 
   /* ---------- persistence ---------- */
@@ -405,11 +416,17 @@ button{font-family:inherit}
   var checkSVG = '<svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 7"/></svg>';
   var editSVG  = '<svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
   var delSVG   = '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.9 12.1a1 1 0 0 0 1 .9h7.2a1 1 0 0 0 1-.9L18.5 7"/></svg>';
+  var receiptSVG = '<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v14.5l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2V3z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>';
 
   /* ---------- render with FLIP reordering ---------- */
   function render(){
-    placeEl.textContent = state.place;
-    metaEl.textContent  = state.meta;
+    if(state.items.length){
+      placeEl.textContent = state.place || "Receipt";
+      metaEl.textContent  = state.meta || "";
+    }else{
+      placeEl.textContent = "New bill";
+      metaEl.textContent  = "Scan a receipt to get started";
+    }
     currSel.value = state.currency;
 
     var reduce = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -424,8 +441,13 @@ button{font-family:inherit}
 
     if(state.items.length===0){
       var e=document.createElement("div"); e.className="empty";
-      e.innerHTML="No items yet.<br>Scan a receipt photo, or tap Sample.";
+      e.innerHTML =
+        '<div class="eicon">'+receiptSVG+'</div>'+
+        '<p><strong>No receipt yet.</strong><br>Scan a photo to split a bill by item.</p>'+
+        '<button class="linkbtn" id="demo" type="button">Load a demo receipt</button>';
       listEl.appendChild(e);
+      var demo=$("demo");
+      if(demo) demo.addEventListener("click",function(){ loadDemo(); render(); save(); });
       updateTotals(); return;
     }
 
@@ -560,9 +582,9 @@ button{font-family:inherit}
     state.currency = currSel.value; render(); save();
   });
 
-  /* ---------- sample ---------- */
-  $("reset").addEventListener("click",function(){
-    loadSample(); render(); save();
+  /* ---------- clear ---------- */
+  $("clear").addEventListener("click",function(){
+    clearAll(); render(); save();
   });
 
   /* ---------- photo → OCR → new receipt ---------- */
@@ -612,7 +634,7 @@ button{font-family:inherit}
     });
   });
 
-  var SKIP = /(SUMA|VISO|TOTAL|PVM|MOKĖJIMAI|MOKEJIMAI|KVIT|SĄSKAIT|SASKAIT|UŽSAKYM|UZSAKYM|STALAS|SVEČI|SVECI|ČEKIS|CEKIS|KORTEL|GRYN|KODAS|SAUGOS|PARAŠAS|PARASAS|RESTORAN|UAB|VILNIAUS|BAIGTAS|PRADĖTAS|PRADETAS|PADAVĖJ|PADAVEJ)/i;
+  var SKIP = /(SUMA|VISO|TOTAL|PVM|MOKĖJIMAI|MOKEJIMAI|KVIT|SĄSKAIT|SASKAIT|UŽSAKYM|UZSAKYM|STALAS|SVEČI|SVECI|ČEKIS|CEKIS|KORTEL|GRYN|KODAS|SAUGOS|PARAŠAS|PARASAS|RESTORAN|UAB|BAIGTAS|PRADĖTAS|PRADETAS|PADAVĖJ|PADAVEJ)/i;
 
   function toNum(s){ return parseFloat(s.replace(/\s/g,"").replace(",", ".")); }
 
@@ -665,7 +687,7 @@ button{font-family:inherit}
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 
   /* ---------- boot ---------- */
-  if(!restore()) loadSample();
+  restore();
   render();
 })();
 </script>
