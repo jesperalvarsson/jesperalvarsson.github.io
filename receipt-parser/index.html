@@ -19,9 +19,7 @@
   --shadow:0 18px 40px -22px rgba(70,45,35,.45);
   --radius:16px;
 }
-:root:not([data-theme="light"]){
-  color-scheme:light;
-}
+:root:not([data-theme="light"]){ color-scheme:light; }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
@@ -80,11 +78,9 @@ button{font-family:inherit}
   margin-top:7px; font-family:"Spline Sans Mono",monospace;
   font-size:12px; color:var(--ink-2); letter-spacing:.02em;
 }
-/* torn/perforated bottom edge */
 .masthead::after{
   content:""; position:absolute; left:0; right:0; bottom:-8px; height:8px;
-  background:
-    radial-gradient(circle at 8px -2px, transparent 6px, var(--surface) 6.5px) 0 0/16px 8px repeat-x;
+  background:radial-gradient(circle at 8px -2px, transparent 6px, var(--surface) 6.5px) 0 0/16px 8px repeat-x;
 }
 
 /* ---------- list ---------- */
@@ -100,8 +96,8 @@ button{font-family:inherit}
 .divider::before,.divider::after{content:"";height:1px;flex:1;background:var(--line)}
 
 .card{
-  display:flex; align-items:center; gap:13px; width:100%; text-align:left;
-  padding:13px 15px; border-radius:var(--radius);
+  display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  padding:11px 12px 11px 15px; border-radius:var(--radius);
   background:var(--card); border:1.5px solid var(--line);
   color:inherit; cursor:pointer;
   transition:border-color .18s, background .18s, box-shadow .18s, transform .1s;
@@ -133,15 +129,24 @@ button{font-family:inherit}
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
 
-/* selected */
+.rowactions{display:flex; gap:1px; flex:none}
+.iconbtn{
+  width:30px; height:30px; display:grid; place-items:center;
+  border:none; background:transparent; color:var(--ink-3);
+  border-radius:8px; cursor:pointer; transition:.14s;
+}
+.iconbtn:hover{background:var(--surface); color:var(--ink)}
+.iconbtn.del:hover{color:var(--accent)}
+.iconbtn svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
 .card.sel{border-color:var(--accent); background:var(--accent-wash)}
 .card.sel .tick{background:var(--accent); border-color:var(--accent)}
 .card.sel .tick svg{opacity:1;transform:scale(1)}
 
-/* paid */
 .card.paid{
   cursor:default; background:var(--surface); border-color:var(--line);
-  opacity:.72; position:relative;
+  opacity:.72; position:relative; padding-right:15px;
 }
 .card.paid .name{color:var(--ink-2); text-decoration:line-through; text-decoration-color:var(--ink-3)}
 .card.paid .price{color:var(--ink-3)}
@@ -217,7 +222,7 @@ button{font-family:inherit}
   max-width:88vw; z-index:40;
   display:flex; align-items:center; gap:11px;
   background:var(--ink); color:var(--paper);
-  padding:12px 18px; border-radius:12px; font-size:13.5px; font-weight:500;
+  padding:12px 18px; border-radius:12px; font-size:13.5px; font-weight:500; line-height:1.4;
   box-shadow:0 14px 34px -12px rgba(0,0,0,.5);
 }
 .spin{width:15px;height:15px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .7s linear infinite;flex:none}
@@ -264,10 +269,10 @@ button{font-family:inherit}
   <div class="addbar">
     <label class="addbtn">
       <svg viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1-1.6a1 1 0 0 1 .85-.4h6a1 1 0 0 1 .85.4l1 1.6h1.7A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.4"/></svg>
-      <span id="addlabel">Add receipt from photo</span>
+      <span id="addlabel">Scan a receipt photo</span>
       <input type="file" accept="image/*" capture="environment" hidden id="photo">
     </label>
-    <button class="ghost" id="reset" title="Reload the sample receipt">Reset</button>
+    <button class="ghost" id="reset" title="Reload the sample receipt">Sample</button>
   </div>
 
   <footer class="settle">
@@ -355,9 +360,7 @@ button{font-family:inherit}
   }
 
   /* ---------- persistence ---------- */
-  function save(){
-    try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){}
-  }
+  function save(){ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
   function restore(){
     try{
       var raw = localStorage.getItem(STORE);
@@ -392,6 +395,8 @@ button{font-family:inherit}
   });
 
   var checkSVG = '<svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 7"/></svg>';
+  var editSVG  = '<svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
+  var delSVG   = '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.9 12.1a1 1 0 0 0 1 .9h7.2a1 1 0 0 0 1-.9L18.5 7"/></svg>';
 
   /* ---------- render with FLIP reordering ---------- */
   function render(){
@@ -411,7 +416,7 @@ button{font-family:inherit}
 
     if(state.items.length===0){
       var e=document.createElement("div"); e.className="empty";
-      e.innerHTML="No items yet.<br>Add a receipt photo, or hit Reset for the sample.";
+      e.innerHTML="No items yet.<br>Scan a receipt photo, or tap Sample.";
       listEl.appendChild(e);
       updateTotals(); return;
     }
@@ -448,9 +453,13 @@ button{font-family:inherit}
   }
 
   function cardEl(it){
-    var b=document.createElement("button");
+    var b=document.createElement("div");
     b.className="card"+(it.selected?" sel":"")+(it.paid?" paid":"");
-    b.dataset.id=it.id; b.type="button";
+    b.dataset.id=it.id;
+    if(!it.paid){
+      b.tabIndex=0; b.setAttribute("role","button");
+      b.setAttribute("aria-pressed", it.selected?"true":"false");
+    }
 
     var tags="";
     if(it.groupSize>1) tags+='<span class="chip split">'+it.groupIndex+" of "+it.groupSize+"</span>";
@@ -461,19 +470,48 @@ button{font-family:inherit}
       '<span class="body"><span class="name">'+esc(it.name)+'</span>'+
         (tags?'<span class="tags">'+tags+'</span>':'')+'</span>'+
       (it.paid?'<span class="stamp">PAID</span>':'')+
-      '<span class="price">'+fmt(it.price)+'</span>';
+      '<span class="price">'+fmt(it.price)+'</span>'+
+      (it.paid?'':'<span class="rowactions">'+
+         '<button class="iconbtn edit" type="button" aria-label="Edit name and price">'+editSVG+'</button>'+
+         '<button class="iconbtn del" type="button" aria-label="Remove item">'+delSVG+'</button>'+
+       '</span>');
 
     if(!it.paid){
-      b.addEventListener("click",function(){
+      var toggle=function(){
         it.selected=!it.selected;
         b.classList.toggle("sel",it.selected);
-        b.querySelector(".tick").classList; // no-op keep
+        b.setAttribute("aria-pressed", it.selected?"true":"false");
         updateTotals(); save();
+      };
+      b.addEventListener("click",function(ev){
+        if(ev.target.closest(".rowactions")) return;
+        toggle();
       });
-    }else{
-      b.disabled=true;
+      b.addEventListener("keydown",function(ev){
+        if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); toggle(); }
+      });
+      b.querySelector(".edit").addEventListener("click",function(ev){ ev.stopPropagation(); editItem(it); });
+      b.querySelector(".del").addEventListener("click",function(ev){ ev.stopPropagation(); removeItem(it); });
     }
     return b;
+  }
+
+  function editItem(it){
+    var name = window.prompt("Item name", it.name);
+    if(name===null) return;
+    var priceStr = window.prompt("Price in EUR (e.g. 16.00)", it.price.toFixed(2));
+    it.name = (name.trim() || it.name);
+    if(priceStr!==null){
+      var p = parseFloat(priceStr.replace(",","."));
+      if(!isNaN(p) && p>=0) it.price = p;
+    }
+    render(); save();
+  }
+
+  function removeItem(it){
+    state.items = state.items.filter(function(x){return x.id!==it.id;});
+    state.wasAllPaid = state.items.length>0 && state.items.every(function(i){return i.paid;});
+    render(); save();
   }
 
   function updateTotals(){
@@ -514,7 +552,7 @@ button{font-family:inherit}
     state.currency = currSel.value; render(); save();
   });
 
-  /* ---------- reset ---------- */
+  /* ---------- sample ---------- */
   $("reset").addEventListener("click",function(){
     loadSample(); render(); save();
   });
@@ -533,32 +571,36 @@ button{font-family:inherit}
     e.target.value="";
     if(!file) return;
     if(typeof Tesseract==="undefined"){
-      toast("Photo scanning isn't available in this preview — use the deployed app.",false,4200);
+      toast("Photo scanning needs the live app — the preview sandbox blocks it.",false,4600);
       return;
     }
-    toast("Reading receipt… 0%",true);
-    Tesseract.recognize(file,"eng",{
+    toast("Preparing scanner…",true);
+    Tesseract.recognize(file,"eng+lit",{
       logger:function(m){
         if(m.status==="recognizing text"){
           toast("Reading receipt… "+Math.round(m.progress*100)+"%",true);
+        }else if(/traineddata|loading language/i.test(m.status||"")){
+          toast("Downloading language model… (first scan only)",true);
+        }else{
+          toast("Preparing scanner…",true);
         }
       }
     }).then(function(res){
-      var rows = parseReceipt(res.data.text||"");
+      var text = res.data.text||"";
+      var rows = parseReceipt(text);
       if(!rows.length){
-        toast("Couldn't read any line items from that photo.",false,3800);
+        toast("Couldn't read any line items — try a sharper, straight-on photo in good light.",false,4800);
         return;
       }
-      var items = rowsToItems(rows);
-      state.items = state.items.concat(items);
-      state.wasAllPaid=false;
-      var d = detectMeta(res.data.text||"");
-      if(d.place) state.place=d.place;
-      state.meta = "Scanned receipt · "+rows.length+" line"+(rows.length>1?"s":"");
+      state.items = rowsToItems(rows);        // start a fresh bill from this receipt
+      state.payCounter = 0; state.wasAllPaid = false;
+      var d = detectMeta(text);
+      state.place = d.place || "Scanned receipt";
+      state.meta  = rows.length+" line"+(rows.length>1?"s":"")+" scanned · tap ✎ to fix a row";
       render(); save();
-      toast("Added "+items.length+" item"+(items.length>1?"s":"")+" from your photo.",false,3200);
+      toast("Scanned "+state.items.length+" item"+(state.items.length>1?"s":"")+" — check the prices, then split.",false,4800);
     }).catch(function(err){
-      toast("Scan failed: "+(err&&err.message?err.message:"unknown error"),false,4200);
+      toast("Scan failed: "+(err&&err.message?err.message:"unknown error"),false,4800);
     });
   });
 
@@ -577,11 +619,9 @@ button{font-family:inherit}
       if(mult){
         var qty = parseInt(mult[1],10);
         var each = toNum(mult[2]);
-        var nm = line.slice(0,mult.index).trim();
-        nm = cleanName(nm);
+        var nm = cleanName(line.slice(0,mult.index).trim());
         if(nm.length>=2 && qty>0 && qty<=50 && each>0){
-          rows.push({name:nm, price:each, cls:"A", qty:qty});
-          return;
+          rows.push({name:nm, price:each, cls:"A", qty:qty}); return;
         }
       }
       // single price at/near end of line
