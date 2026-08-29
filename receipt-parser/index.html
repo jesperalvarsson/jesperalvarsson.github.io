@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Split the Bill</title>
+<meta name="description" content="Scan a restaurant receipt, split every line onto its own card, select who's paying, and settle up.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<style>
+:root{
+  --paper:#efe9dd; --card:#fffdf8; --surface:#f8f3ea;
+  --ink:#221f1a; --ink-2:#6d675b; --ink-3:#a49b8b;
+  --line:#e6ded0; --line-2:#d7cebb;
+  --accent:#b23a48; --accent-ink:#7d1f2c; --accent-wash:#f6e5e6;
+  --good:#3f7d5c; --good-ink:#2c5c42; --good-wash:#e4efe8;
+  --shadow:0 18px 40px -22px rgba(70,45,35,.45);
+  --radius:16px;
+}
+:root:not([data-theme="light"]){
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#151210; --card:#221d18; --surface:#1c1814;
+    --ink:#f2ecdf; --ink-2:#b4aa97; --ink-3:#847a6a;
+    --line:#332c23; --line-2:#41382c;
+    --accent:#e2727e; --accent-ink:#f2aab0; --accent-wash:#3a2226;
+    --good:#6cc094; --good-ink:#9bd8b7; --good-wash:#22352b;
+    --shadow:0 18px 42px -20px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#151210; --card:#221d18; --surface:#1c1814;
+  --ink:#f2ecdf; --ink-2:#b4aa97; --ink-3:#847a6a;
+  --line:#332c23; --line-2:#41382c;
+  --accent:#e2727e; --accent-ink:#f2aab0; --accent-wash:#3a2226;
+  --good:#6cc094; --good-ink:#9bd8b7; --good-wash:#22352b;
+  --shadow:0 18px 42px -20px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;
+  display:flex; justify-content:center;
+}
+button{font-family:inherit}
+
+.app{
+  width:100%; max-width:500px; min-height:100dvh;
+  display:flex; flex-direction:column;
+  background:var(--card);
+  box-shadow:var(--shadow);
+}
+
+/* ---------- masthead ---------- */
+.masthead{
+  position:relative; background:var(--surface);
+  padding:22px 22px 26px; text-align:center;
+  border-bottom:1px dashed var(--line-2);
+}
+.brand{
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11px; letter-spacing:.28em; text-transform:uppercase;
+  color:var(--accent); font-weight:600; margin-bottom:12px;
+}
+.place{
+  font-family:"Fraunces",Georgia,serif; font-weight:600;
+  font-size:23px; line-height:1.15; text-wrap:balance; margin:0;
+}
+.meta{
+  margin-top:7px; font-family:"Spline Sans Mono",monospace;
+  font-size:12px; color:var(--ink-2); letter-spacing:.02em;
+}
+/* torn/perforated bottom edge */
+.masthead::after{
+  content:""; position:absolute; left:0; right:0; bottom:-8px; height:8px;
+  background:
+    radial-gradient(circle at 8px -2px, transparent 6px, var(--surface) 6.5px) 0 0/16px 8px repeat-x;
+}
+
+/* ---------- list ---------- */
+.list{
+  flex:1; padding:14px 14px 8px; display:flex; flex-direction:column; gap:9px;
+  overflow:visible;
+}
+.divider{
+  display:flex; align-items:center; gap:10px;
+  margin:8px 4px 2px; font-family:"Spline Sans Mono",monospace;
+  font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3);
+}
+.divider::before,.divider::after{content:"";height:1px;flex:1;background:var(--line)}
+
+.card{
+  display:flex; align-items:center; gap:13px; width:100%; text-align:left;
+  padding:13px 15px; border-radius:var(--radius);
+  background:var(--card); border:1.5px solid var(--line);
+  color:inherit; cursor:pointer;
+  transition:border-color .18s, background .18s, box-shadow .18s, transform .1s;
+}
+.card:hover:not(.paid){border-color:var(--line-2)}
+.card:active:not(.paid){transform:scale(.99)}
+.card:focus-visible{outline:2.5px solid var(--accent); outline-offset:2px}
+
+.tick{
+  flex:none; width:24px; height:24px; border-radius:8px;
+  border:1.5px solid var(--line-2); background:var(--surface);
+  display:grid; place-items:center; transition:.16s;
+}
+.tick svg{width:14px;height:14px;stroke:#fff;stroke-width:3;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;opacity:0;transform:scale(.5);transition:.16s}
+
+.body{flex:1; min-width:0}
+.name{font-size:14.5px; font-weight:600; line-height:1.25}
+.tags{display:flex; gap:6px; margin-top:5px; flex-wrap:wrap}
+.chip{
+  font-family:"Spline Sans Mono",monospace; font-size:10px; font-weight:500;
+  letter-spacing:.04em; padding:2px 7px; border-radius:20px;
+  background:var(--surface); color:var(--ink-2); border:1px solid var(--line);
+}
+.chip.split{background:var(--accent-wash); color:var(--accent-ink); border-color:transparent}
+
+.price{
+  font-family:"Spline Sans Mono",monospace; font-weight:600; font-size:15px;
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+
+/* selected */
+.card.sel{border-color:var(--accent); background:var(--accent-wash)}
+.card.sel .tick{background:var(--accent); border-color:var(--accent)}
+.card.sel .tick svg{opacity:1;transform:scale(1)}
+
+/* paid */
+.card.paid{
+  cursor:default; background:var(--surface); border-color:var(--line);
+  opacity:.72; position:relative;
+}
+.card.paid .name{color:var(--ink-2); text-decoration:line-through; text-decoration-color:var(--ink-3)}
+.card.paid .price{color:var(--ink-3)}
+.card.paid .tick{background:var(--good); border-color:var(--good)}
+.card.paid .tick svg{opacity:1;transform:scale(1)}
+.stamp{
+  flex:none; font-family:"Spline Sans Mono",monospace; font-size:9.5px; font-weight:600;
+  letter-spacing:.14em; color:var(--good-ink); background:var(--good-wash);
+  border:1px solid var(--good); border-radius:6px; padding:3px 7px;
+  transform:rotate(-4deg);
+}
+
+.empty{
+  text-align:center; color:var(--ink-3); padding:48px 20px;
+  font-size:14px; line-height:1.6;
+}
+
+/* ---------- add bar ---------- */
+.addbar{display:flex; gap:8px; padding:6px 14px 12px}
+.addbtn{
+  flex:1; display:flex; align-items:center; justify-content:center; gap:9px;
+  padding:12px; border-radius:12px; cursor:pointer;
+  background:var(--card); border:1.5px dashed var(--line-2); color:var(--ink);
+  font-size:13.5px; font-weight:600; transition:.16s;
+}
+.addbtn:hover{border-color:var(--accent); color:var(--accent)}
+.addbtn svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.ghost{
+  padding:12px 14px; border-radius:12px; cursor:pointer;
+  background:transparent; border:1.5px solid var(--line); color:var(--ink-2);
+  font-size:13px; font-weight:600; transition:.16s;
+}
+.ghost:hover{border-color:var(--line-2); color:var(--ink)}
+
+/* ---------- settle bar ---------- */
+.settle{
+  position:sticky; bottom:0; z-index:5;
+  display:flex; align-items:center; gap:12px;
+  padding:15px 18px calc(15px + env(safe-area-inset-bottom));
+  background:var(--surface); border-top:1px solid var(--line);
+  box-shadow:0 -14px 30px -24px rgba(60,40,30,.5);
+}
+.totals{flex:1; min-width:0}
+.tlbl{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-2); font-weight:600}
+.tamt{
+  font-family:"Spline Sans Mono",monospace; font-weight:600;
+  font-size:27px; line-height:1.1; margin-top:2px; font-variant-numeric:tabular-nums;
+  transition:color .2s;
+}
+.tsub{font-size:11.5px; color:var(--ink-3); margin-top:3px; font-variant-numeric:tabular-nums}
+.curr{
+  appearance:none; -webkit-appearance:none;
+  font-family:"Spline Sans Mono",monospace; font-weight:600; font-size:13px;
+  padding:11px 30px 11px 13px; border-radius:11px; cursor:pointer;
+  background:var(--card); color:var(--ink); border:1.5px solid var(--line);
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);
+  background-position:calc(100% - 16px) center,calc(100% - 11px) center;
+  background-size:5px 5px,5px 5px; background-repeat:no-repeat;
+}
+.pay{
+  padding:13px 20px; border-radius:12px; cursor:pointer; white-space:nowrap;
+  background:var(--accent); color:#fff; border:none;
+  font-size:14.5px; font-weight:700; letter-spacing:.01em;
+  box-shadow:0 8px 18px -8px var(--accent); transition:.16s;
+}
+.pay:hover:not(:disabled){filter:brightness(1.05)}
+.pay:active:not(:disabled){transform:translateY(1px)}
+.pay:disabled{background:var(--line-2); color:var(--ink-3); box-shadow:none; cursor:not-allowed}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed; left:50%; bottom:96px; transform:translateX(-50%);
+  max-width:88vw; z-index:40;
+  display:flex; align-items:center; gap:11px;
+  background:var(--ink); color:var(--paper);
+  padding:12px 18px; border-radius:12px; font-size:13.5px; font-weight:500;
+  box-shadow:0 14px 34px -12px rgba(0,0,0,.5);
+}
+.spin{width:15px;height:15px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .7s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- finished ---------- */
+.finished{
+  position:fixed; inset:0; z-index:60; display:grid; place-items:center;
+  background:rgba(30,20,15,.4); backdrop-filter:blur(3px);
+  animation:fade .25s ease;
+}
+.fcard{
+  background:var(--card); color:var(--ink); text-align:center;
+  padding:34px 44px; border-radius:22px; box-shadow:0 30px 70px -20px rgba(0,0,0,.5);
+  animation:pop .4s cubic-bezier(.2,1.3,.4,1);
+}
+.fcheck{
+  width:62px;height:62px;border-radius:50%;background:var(--good-wash);
+  display:grid;place-items:center;margin:0 auto 16px;
+}
+.fcheck svg{width:32px;height:32px;stroke:var(--good);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.ftitle{font-family:"Fraunces",Georgia,serif; font-weight:600; font-size:28px}
+.fsub{color:var(--ink-2); font-size:13.5px; margin-top:5px}
+@keyframes fade{from{opacity:0}}
+@keyframes pop{from{opacity:0;transform:scale(.85)}}
+
+[hidden]{display:none!important}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important; transition-duration:.001s!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="masthead">
+    <div class="brand">Split&nbsp;·&nbsp;the&nbsp;bill</div>
+    <h1 class="place" id="place">Restoranas “St. Valentino”</h1>
+    <div class="meta" id="meta">Table 4 · 6 guests · 2026-08-29</div>
+  </header>
+
+  <main class="list" id="list"></main>
+
+  <div class="addbar">
+    <label class="addbtn">
+      <svg viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1-1.6a1 1 0 0 1 .85-.4h6a1 1 0 0 1 .85.4l1 1.6h1.7A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.4"/></svg>
+      <span id="addlabel">Add receipt from photo</span>
+      <input type="file" accept="image/*" capture="environment" hidden id="photo">
+    </label>
+    <button class="ghost" id="reset" title="Reload the sample receipt">Reset</button>
+  </div>
+
+  <footer class="settle">
+    <div class="totals">
+      <div class="tlbl">Selected</div>
+      <div class="tamt" id="total">€0.00</div>
+      <div class="tsub" id="progress">nothing settled yet</div>
+    </div>
+    <select class="curr" id="curr" aria-label="Currency"></select>
+    <button class="pay" id="pay" disabled>Payed</button>
+  </footer>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<div class="finished" id="finished" hidden>
+  <div class="fcard">
+    <div class="fcheck"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+    <div class="ftitle">Finished</div>
+    <div class="fsub">The whole bill is settled.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- currencies (rates relative to EUR) ---------- */
+  var CURRENCIES = {
+    EUR:{rate:1,    locale:"de-DE"},
+    USD:{rate:1.08, locale:"en-US"},
+    GBP:{rate:0.85, locale:"en-GB"},
+    PLN:{rate:4.30, locale:"pl-PL"},
+    SEK:{rate:11.3, locale:"sv-SE"},
+    CHF:{rate:0.95, locale:"de-CH"}
+  };
+
+  /* ---------- the example receipt (prices in EUR) ---------- */
+  var SAMPLE = {
+    place:"Restoranas “St. Valentino”",
+    meta:"Table 4 · 6 guests · 2026-08-29",
+    rows:[
+      {name:"Stalo vanduo su priedais 1 l",            price:4.50, cls:"A", qty:1},
+      {name:"ACALA 330 ml",                            price:6.80, cls:"A", qty:1},
+      {name:"Užstatas už pakuotę",                     price:0.10, cls:"E", qty:1},
+      {name:"San Pellegrino 750 ml",                   price:5.80, cls:"A", qty:1},
+      {name:"Žalieji kokteiliai",                      price:7.00, cls:"A", qty:2},
+      {name:"Burokėlių sr. su jautiena",               price:6.00, cls:"A", qty:1},
+      {name:"Traškios daržovės keptos ant grotelių",   price:16.00,cls:"A", qty:3},
+      {name:"Grill lašišos filė (priedas)",            price:7.00, cls:"A", qty:3},
+      {name:"Kold. su jautiena, barav. padaže",        price:16.00,cls:"A", qty:1},
+      {name:"Burok. krosn. su ožkos sū.",              price:15.00,cls:"A", qty:1},
+      {name:"Salotos su antiena lėtai troškinta",      price:17.00,cls:"A", qty:1},
+      {name:"Galvanina vanduo 355 ml",                 price:3.80, cls:"A", qty:1},
+      {name:"Užstatas už pakuotę",                     price:0.10, cls:"E", qty:1}
+    ]
+  };
+
+  /* ---------- state ---------- */
+  var state = { place:"", meta:"", currency:"EUR", items:[], payCounter:0, wasAllPaid:false };
+  var uid = 0;
+  var STORE = "receipt-splitter-v1";
+
+  /* expand receipt rows into one card per unit (multi-item rows split) */
+  function rowsToItems(rows){
+    var out = [];
+    rows.forEach(function(r){
+      var qty = r.qty || 1;
+      for(var i=0;i<qty;i++){
+        out.push({
+          id:++uid, name:r.name, price:r.price, cls:r.cls||"A",
+          groupSize:qty, groupIndex:i+1,
+          selected:false, paid:false, paidAt:0
+        });
+      }
+    });
+    return out;
+  }
+
+  function loadSample(){
+    state.place = SAMPLE.place;
+    state.meta  = SAMPLE.meta;
+    state.items = rowsToItems(SAMPLE.rows);
+    state.payCounter = 0; state.wasAllPaid = false;
+  }
+
+  /* ---------- persistence ---------- */
+  function save(){
+    try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){}
+  }
+  function restore(){
+    try{
+      var raw = localStorage.getItem(STORE);
+      if(!raw) return false;
+      var s = JSON.parse(raw);
+      if(!s || !Array.isArray(s.items)) return false;
+      state = s;
+      state.items.forEach(function(it){ if(it.id>uid) uid = it.id; });
+      if(!CURRENCIES[state.currency]) state.currency = "EUR";
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* ---------- money ---------- */
+  function fmt(eur){
+    var c = CURRENCIES[state.currency];
+    try{
+      return new Intl.NumberFormat(c.locale,{style:"currency",currency:state.currency}).format(eur*c.rate);
+    }catch(e){
+      return (eur*c.rate).toFixed(2)+" "+state.currency;
+    }
+  }
+
+  /* ---------- DOM refs ---------- */
+  var $ = function(id){ return document.getElementById(id); };
+  var listEl=$("list"), totalEl=$("total"), progEl=$("progress"),
+      payBtn=$("pay"), currSel=$("curr"), placeEl=$("place"), metaEl=$("meta"),
+      toastEl=$("toast"), finishedEl=$("finished");
+
+  Object.keys(CURRENCIES).forEach(function(code){
+    var o=document.createElement("option"); o.value=code; o.textContent=code; currSel.appendChild(o);
+  });
+
+  var checkSVG = '<svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 7"/></svg>';
+
+  /* ---------- render with FLIP reordering ---------- */
+  function render(){
+    placeEl.textContent = state.place;
+    metaEl.textContent  = state.meta;
+    currSel.value = state.currency;
+
+    var reduce = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+    var first = {};
+    if(!reduce){
+      Array.prototype.forEach.call(listEl.children,function(el){
+        if(el.dataset && el.dataset.id) first[el.dataset.id]=el.getBoundingClientRect();
+      });
+    }
+
+    listEl.innerHTML = "";
+
+    if(state.items.length===0){
+      var e=document.createElement("div"); e.className="empty";
+      e.innerHTML="No items yet.<br>Add a receipt photo, or hit Reset for the sample.";
+      listEl.appendChild(e);
+      updateTotals(); return;
+    }
+
+    var unpaid = state.items.filter(function(i){return !i.paid;});
+    var paid   = state.items.filter(function(i){return i.paid;})
+                            .sort(function(a,b){return a.paidAt-b.paidAt;});
+
+    unpaid.forEach(function(it){ listEl.appendChild(cardEl(it)); });
+    if(paid.length){
+      var d=document.createElement("div"); d.className="divider";
+      d.textContent="Settled · "+paid.length;
+      listEl.appendChild(d);
+      paid.forEach(function(it){ listEl.appendChild(cardEl(it)); });
+    }
+
+    if(!reduce){
+      Array.prototype.forEach.call(listEl.children,function(el){
+        var id = el.dataset && el.dataset.id;
+        if(!id || !first[id]) return;
+        var last = el.getBoundingClientRect();
+        var dx = first[id].left-last.left, dy = first[id].top-last.top;
+        if(!dx && !dy) return;
+        el.style.transform = "translate("+dx+"px,"+dy+"px)";
+        el.style.transition = "none";
+        requestAnimationFrame(function(){
+          el.style.transition = "transform .42s cubic-bezier(.2,.8,.2,1)";
+          el.style.transform = "";
+        });
+      });
+    }
+
+    updateTotals();
+  }
+
+  function cardEl(it){
+    var b=document.createElement("button");
+    b.className="card"+(it.selected?" sel":"")+(it.paid?" paid":"");
+    b.dataset.id=it.id; b.type="button";
+
+    var tags="";
+    if(it.groupSize>1) tags+='<span class="chip split">'+it.groupIndex+" of "+it.groupSize+"</span>";
+    if(it.cls==="E")   tags+='<span class="chip">deposit</span>';
+
+    b.innerHTML =
+      '<span class="tick">'+checkSVG+'</span>'+
+      '<span class="body"><span class="name">'+esc(it.name)+'</span>'+
+        (tags?'<span class="tags">'+tags+'</span>':'')+'</span>'+
+      (it.paid?'<span class="stamp">PAID</span>':'')+
+      '<span class="price">'+fmt(it.price)+'</span>';
+
+    if(!it.paid){
+      b.addEventListener("click",function(){
+        it.selected=!it.selected;
+        b.classList.toggle("sel",it.selected);
+        b.querySelector(".tick").classList; // no-op keep
+        updateTotals(); save();
+      });
+    }else{
+      b.disabled=true;
+    }
+    return b;
+  }
+
+  function updateTotals(){
+    var selected = state.items.filter(function(i){return i.selected && !i.paid;});
+    var sum = selected.reduce(function(a,i){return a+i.price;},0);
+    totalEl.textContent = fmt(sum);
+    totalEl.style.color = sum>0 ? "var(--accent)" : "var(--ink)";
+
+    var paidCount = state.items.filter(function(i){return i.paid;}).length;
+    var total = state.items.length;
+    if(total===0){ progEl.textContent="nothing to settle"; }
+    else if(selected.length){ progEl.textContent = selected.length+" item"+(selected.length>1?"s":"")+" selected · "+paidCount+"/"+total+" settled"; }
+    else { progEl.textContent = paidCount+" of "+total+" items settled"; }
+
+    payBtn.disabled = selected.length===0;
+  }
+
+  /* ---------- pay ---------- */
+  payBtn.addEventListener("click",function(){
+    var selected = state.items.filter(function(i){return i.selected && !i.paid;});
+    if(!selected.length) return;
+    selected.forEach(function(it){ it.paid=true; it.selected=false; it.paidAt=++state.payCounter; });
+    render(); save();
+
+    var allPaid = state.items.length>0 && state.items.every(function(i){return i.paid;});
+    if(allPaid && !state.wasAllPaid){ showFinished(); }
+    state.wasAllPaid = allPaid;
+    save();
+  });
+
+  function showFinished(){
+    finishedEl.hidden=false;
+    setTimeout(function(){ finishedEl.hidden=true; }, 2000);
+  }
+
+  /* ---------- currency ---------- */
+  currSel.addEventListener("change",function(){
+    state.currency = currSel.value; render(); save();
+  });
+
+  /* ---------- reset ---------- */
+  $("reset").addEventListener("click",function(){
+    loadSample(); render(); save();
+  });
+
+  /* ---------- photo → OCR → new receipt ---------- */
+  var toastTimer;
+  function toast(msg,spinning,ms){
+    clearTimeout(toastTimer);
+    toastEl.innerHTML = (spinning?'<span class="spin"></span>':'')+esc(msg);
+    toastEl.hidden=false;
+    if(ms) toastTimer=setTimeout(function(){toastEl.hidden=true;},ms);
+  }
+
+  $("photo").addEventListener("change",function(e){
+    var file = e.target.files && e.target.files[0];
+    e.target.value="";
+    if(!file) return;
+    if(typeof Tesseract==="undefined"){
+      toast("Photo scanning isn't available in this preview — use the deployed app.",false,4200);
+      return;
+    }
+    toast("Reading receipt… 0%",true);
+    Tesseract.recognize(file,"eng",{
+      logger:function(m){
+        if(m.status==="recognizing text"){
+          toast("Reading receipt… "+Math.round(m.progress*100)+"%",true);
+        }
+      }
+    }).then(function(res){
+      var rows = parseReceipt(res.data.text||"");
+      if(!rows.length){
+        toast("Couldn't read any line items from that photo.",false,3800);
+        return;
+      }
+      var items = rowsToItems(rows);
+      state.items = state.items.concat(items);
+      state.wasAllPaid=false;
+      var d = detectMeta(res.data.text||"");
+      if(d.place) state.place=d.place;
+      state.meta = "Scanned receipt · "+rows.length+" line"+(rows.length>1?"s":"");
+      render(); save();
+      toast("Added "+items.length+" item"+(items.length>1?"s":"")+" from your photo.",false,3200);
+    }).catch(function(err){
+      toast("Scan failed: "+(err&&err.message?err.message:"unknown error"),false,4200);
+    });
+  });
+
+  var SKIP = /(SUMA|VISO|TOTAL|PVM|MOKĖJIMAI|MOKEJIMAI|KVIT|SĄSKAIT|SASKAIT|UŽSAKYM|UZSAKYM|STALAS|SVEČI|SVECI|ČEKIS|CEKIS|KORTEL|GRYN|KODAS|SAUGOS|PARAŠAS|PARASAS|RESTORAN|UAB|VILNIAUS|BAIGTAS|PRADĖTAS|PRADETAS|PADAVĖJ|PADAVEJ)/i;
+
+  function toNum(s){ return parseFloat(s.replace(/\s/g,"").replace(",", ".")); }
+
+  function parseReceipt(text){
+    var rows=[];
+    text.split(/\r?\n/).forEach(function(raw){
+      var line = raw.replace(/\s+/g," ").trim();
+      if(line.length<3 || SKIP.test(line)) return;
+
+      // quantity form:  "3x16,00" or "3 x 16.00"
+      var mult = line.match(/(\d{1,3})\s*[x×*]\s*(\d{1,4}[.,]\d{2})/);
+      if(mult){
+        var qty = parseInt(mult[1],10);
+        var each = toNum(mult[2]);
+        var nm = line.slice(0,mult.index).trim();
+        nm = cleanName(nm);
+        if(nm.length>=2 && qty>0 && qty<=50 && each>0){
+          rows.push({name:nm, price:each, cls:"A", qty:qty});
+          return;
+        }
+      }
+      // single price at/near end of line
+      var prices = line.match(/\d{1,4}[.,]\d{2}/g);
+      if(prices){
+        var price = toNum(prices[prices.length-1]);
+        var idx = line.lastIndexOf(prices[prices.length-1]);
+        var name = cleanName(line.slice(0,idx));
+        if(name.length>=2 && price>0 && price<2000){
+          rows.push({name:name, price:price, cls:"A", qty:1});
+        }
+      }
+    });
+    return rows;
+  }
+
+  function cleanName(s){
+    return s.replace(/[\$\*•·]+/g," ")
+            .replace(/\s+[A-E]\s*$/,"")   // trailing VAT class letter
+            .replace(/[-–—:]+\s*$/,"")
+            .replace(/\s+/g," ").trim();
+  }
+
+  function detectMeta(text){
+    var lines = text.split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
+    var place="";
+    for(var i=0;i<Math.min(4,lines.length);i++){
+      if(lines[i].length>3 && !/\d{2}[.,]\d{2}/.test(lines[i])){ place=lines[i].replace(/\s+/g," "); break; }
+    }
+    return {place:place};
+  }
+
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+  /* ---------- boot ---------- */
+  if(!restore()) loadSample();
+  render();
+})();
+</script>
+</body>
+</html>
